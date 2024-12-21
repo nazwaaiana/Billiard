@@ -6,6 +6,9 @@ const float TableHeight = 550.0f;
 const float TableBorder = 40.0f;
 const float BallRadius = 18.0f;
 const float MinVelocity = 0.99f;
+const float VELOCITY_THRESHOLD = 0.01f;
+const float COLLISION_THRESHOLD = 0.1f;
+
 
 const float WindowWidth = TableWidth + TableBorder * 2;
 const float WindowHeight = TableHeight + TableBorder * 2;
