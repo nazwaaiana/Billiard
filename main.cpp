@@ -1,11 +1,15 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
+#include <vector>
+#include <cmath>
 #include "Ball.cpp"
 #include "Stick.cpp"
 #include "PoolTable.cpp"
+#include "Player.cpp"
+#include "Score.cpp"
 
 bool isBallStopped(const sf::Vector2f& velocity) {
-    return std::abs(velocity.x) < VELOCITY_THRESHOLD && std::abs(velocity.y) < VELOCITY_THRESHOLD;
+    return std::abs(velocity.x) < MinVelocity && std::abs(velocity.y) < MinVelocity;
 }
 
 void checkCollision(Ball& ball1, Ball& ball2) {
@@ -32,6 +36,34 @@ void drawBackground(sf::RenderWindow& window) {
     sf::RectangleShape background(sf::Vector2f(BackWidth, BackHeight));
     background.setFillColor(sf::Color(150, 0, 0));
     window.draw(background);
+}
+
+bool checkFoul(const std::vector<Ball>& balls, int currentPlayer, int player1Type, int player2Type) {
+    bool foul = false;
+    bool cueBallHit = false;
+    bool targetBallHit = false;
+
+    for (const auto& ball : balls) {
+        if (ball.getID() == 0 && ball.isMoving()) {
+            cueBallHit = true;
+        } else if ((currentPlayer == 1 && player1Type != -1 && ball.getID() == player1Type) || 
+                   (currentPlayer == 2 && player2Type != -1 && ball.getID() == player2Type)) {
+            if (ball.isMoving()) {
+                targetBallHit = true;
+            }
+        }
+    }
+
+    if (!cueBallHit) {
+        std::cout << "Foul: Cue ball tidak menyentuh bola lain." << std::endl;
+        foul = true;
+    } else if ((currentPlayer == 1 && player1Type != -1 && !targetBallHit) || 
+               (currentPlayer == 2 && player2Type != -1 && !targetBallHit)) {
+        std::cout << "Foul: Tidak mengenai bola target terlebih dahulu." << std::endl;
+        foul = true;
+    }
+
+    return foul;
 }
 
 int main() {
@@ -65,16 +97,24 @@ int main() {
 
     PoolTable table;
     Stick cue;
+
     sf::Clock clock;
+    sf::Text player1Text("Player 1", font, 25);
+    sf::Text player2Text("Player 2", font, 25);
 
-    sf::Text player1Text("Player 1", font, 30);
-    sf::Text player2Text("Player 2", font, 30);
+    sf::FloatRect player1Bounds = player1Text.getGlobalBounds();
+    sf::FloatRect player2Bounds = player2Text.getGlobalBounds();
 
-    player1Text.setPosition(50, 50);
-    player2Text.setPosition(BackWidth - 150, 50);
+    player1Text.setPosition((BackWidth / 4) - (player1Bounds.width / 2), 10); 
+    player2Text.setPosition((BackWidth * 3 / 4) - (player2Bounds.width / 2), 10); 
 
-    // Variabel pemain
-    int currentPlayer = 1; // 1 untuk Player 1, 2 untuk Player 2
+    Score player1Score(font, (BackWidth / 4) - 100, 50);
+    Score player2Score(font, (BackWidth * 3 / 4) - 100, 50);
+
+    int player1Type = -1; 
+    int player2Type = -1; 
+
+    int currentPlayer = 2; 
     bool ballPocketed = false;
 
     while (window.isOpen()) {
@@ -86,7 +126,6 @@ int main() {
             if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
                 cue.startMove(balls[0].getPosition());
             }
-
             if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left) {
                 cue.endMove(balls[0], sf::Vector2f(sf::Mouse::getPosition(window)));
             }
@@ -97,7 +136,6 @@ int main() {
         for (auto& ball : balls) {
             ball.update(deltaTime);
         }
-
         for (size_t i = 0; i < balls.size(); ++i) {
             for (size_t j = i + 1; j < balls.size(); ++j) {
                 checkCollision(balls[i], balls[j]);
@@ -106,38 +144,86 @@ int main() {
 
         for (auto it = balls.begin(); it != balls.end();) {
             if (table.isPocketed(*it)) {
-                if (it == balls.begin()) {
-                    // Jika bola putih masuk
-                    std::cout << "Bola putih masuk ke lubang!" << std::endl;
-                    it->respawn(); 
-                    ++it;
-                } else {
-                    // Jika bola warna masuk
-                    std::cout << "Bola warna masuk" << std::endl;
-                    it = balls.erase(it); 
-                    ballPocketed = true; // Tandai bahwa bola masuk
+                int ballID = it->getID();
+
+                if (ballID == 0) { 
+                    std::cout << "Bola putih masuk ke lubang. Ganti giliran!" << std::endl;
+                    it->respawn();
+                    currentPlayer = (currentPlayer == 1) ? 2 : 1;
+                    ++it; 
+
+                } else if (ballID == 8) { 
+                    std::cout << "Bola hitam masuk ke lubang. Permainan selesai!" << std::endl;
+
+                    int winner = (currentPlayer == 1) ? 2 : 1;
+                    std::cout << "Pemenangnya adalah Player " << winner << "!" << std::endl;
+
+                    window.close();
+                    break;
+
+                } else { 
+                    int ballType = (ballID >= 1 && ballID <= 7) ? 1 : 2; 
+                    if (currentPlayer == 1) {
+
+                        if (player1Type == -1) {
+                            player1Type = ballType;
+                            player2Type = (ballType == 1) ? 2 : 1;
+                            std::cout << "Player 1 memilih bola " << ((player1Type == 1) ? "solid" : "striped") << "." << std::endl;
+                            player1Score.addScore(ballID, it->getColor());
+
+                        } else if (player1Type == ballType) {
+                            player1Score.addScore(ballID, it->getColor());
+
+                        } else {
+                            std::cout << "Player 1 memasukkan bola lawan. Ganti giliran!" << std::endl;
+                            currentPlayer = 2;
+                            player2Score.addScore(ballID, it->getColor());
+                        }
+
+                    } else {
+                        if (player2Type == -1) {
+                            player2Type = ballType;
+                            player1Type = (ballType == 1) ? 2 : 1;
+                            std::cout << "Player 2 memilih bola " << ((player2Type == 1) ? "solid" : "striped") << "." << std::endl;
+                            player2Score.addScore(ballID, it->getColor());
+
+                        } else if (player2Type == ballType) {
+                            player2Score.addScore(ballID, it->getColor());
+
+                        } else {
+                            std::cout << "Player 2 memasukkan bola lawan. Ganti giliran!" << std::endl;
+                            currentPlayer = 1;
+                            player1Score.addScore(ballID, it->getColor());
+                        }
+                    }
+                    ballPocketed = true;
+                    it = balls.erase(it);
                 }
             } else {
                 ++it;
             }
         }
 
-        static bool turnEnded = false; // Variabel untuk mengecek akhir giliran
+        static bool turnEnded = false;
         if (isBallStopped(balls[0].getVelocity()) && !turnEnded) {
             if (ballPocketed) {
-                // Jika bola berhasil masuk, pemain tetap melanjutkan giliran
                 std::cout << "Bola masuk! Pemain tetap melanjutkan giliran." << std::endl;
                 turnEnded = true;
                 ballPocketed = false;
+
             } else {
-                // Jika tidak ada bola masuk, ganti giliran pemain
-                currentPlayer = (currentPlayer == 1) ? 2 : 1;
-                std::cout << "Tidak ada bola masuk. Ganti giliran ke pemain " << currentPlayer << "." << std::endl;
+                if (checkFoul(balls, currentPlayer, player1Type, player2Type)) {
+                    currentPlayer = (currentPlayer == 1) ? 2 : 1;
+                    std::cout << "Foul terjadi. Ganti giliran ke pemain " << currentPlayer << "." << std::endl;
+
+                } else {
+                    currentPlayer = (currentPlayer == 1) ? 2 : 1;
+                    std::cout << "Tidak ada bola masuk. Ganti giliran ke pemain " << currentPlayer << "." << std::endl;
+                }
                 turnEnded = true;
             }
         }
 
-        // Jika bola mulai bergerak lagi, reset kondisi akhir giliran
         if (!isBallStopped(balls[0].getVelocity())) {
             turnEnded = false;
         }
@@ -154,9 +240,9 @@ int main() {
                 ++i;
             }
         }
-        
+
         cue.update(balls[0].getPosition(), sf::Vector2f(sf::Mouse::getPosition(window)));
-        
+
         player1Text.setFillColor((currentPlayer == 1) ? sf::Color::White : sf::Color(100, 100, 100));
         player2Text.setFillColor((currentPlayer == 2) ? sf::Color::White : sf::Color(100, 100, 100));
 
@@ -165,6 +251,10 @@ int main() {
         table.draw(window);
         window.draw(player1Text);
         window.draw(player2Text);
+
+        player1Score.draw(window);
+        player2Score.draw(window);
+
         for (const auto& ball : balls) {
             ball.draw(window, font);
         }
