@@ -4,6 +4,10 @@
 #include "Stick.cpp"
 #include "PoolTable.cpp"
 
+bool isBallStopped(const sf::Vector2f& velocity) {
+    return std::abs(velocity.x) < VELOCITY_THRESHOLD && std::abs(velocity.y) < VELOCITY_THRESHOLD;
+}
+
 void checkCollision(Ball& ball1, Ball& ball2) {
     sf::Vector2f direction = ball2.getPosition() - ball1.getPosition();
     float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y);
@@ -39,7 +43,6 @@ int main() {
         return -1;
     }
 
-
     std::vector<Ball> balls;
     balls.push_back(Ball(BallRadius, sf::Vector2f(200.0f, 330.0f), sf::Color::White, 0, font)); 
 
@@ -63,6 +66,16 @@ int main() {
     PoolTable table;
     Stick cue;
     sf::Clock clock;
+
+    sf::Text player1Text("Player 1", font, 30);
+    sf::Text player2Text("Player 2", font, 30);
+
+    player1Text.setPosition(50, 50);
+    player2Text.setPosition(BackWidth - 150, 50);
+
+    // Variabel pemain
+    int currentPlayer = 1; // 1 untuk Player 1, 2 untuk Player 2
+    bool ballPocketed = false;
 
     while (window.isOpen()) {
         sf::Event event;
@@ -91,6 +104,44 @@ int main() {
             }
         }
 
+        for (auto it = balls.begin(); it != balls.end();) {
+            if (table.isPocketed(*it)) {
+                if (it == balls.begin()) {
+                    // Jika bola putih masuk
+                    std::cout << "Bola putih masuk ke lubang!" << std::endl;
+                    it->respawn(); 
+                    ++it;
+                } else {
+                    // Jika bola warna masuk
+                    std::cout << "Bola warna masuk" << std::endl;
+                    it = balls.erase(it); 
+                    ballPocketed = true; // Tandai bahwa bola masuk
+                }
+            } else {
+                ++it;
+            }
+        }
+
+        static bool turnEnded = false; // Variabel untuk mengecek akhir giliran
+        if (isBallStopped(balls[0].getVelocity()) && !turnEnded) {
+            if (ballPocketed) {
+                // Jika bola berhasil masuk, pemain tetap melanjutkan giliran
+                std::cout << "Bola masuk! Pemain tetap melanjutkan giliran." << std::endl;
+                turnEnded = true;
+                ballPocketed = false;
+            } else {
+                // Jika tidak ada bola masuk, ganti giliran pemain
+                currentPlayer = (currentPlayer == 1) ? 2 : 1;
+                std::cout << "Tidak ada bola masuk. Ganti giliran ke pemain " << currentPlayer << "." << std::endl;
+                turnEnded = true;
+            }
+        }
+
+        // Jika bola mulai bergerak lagi, reset kondisi akhir giliran
+        if (!isBallStopped(balls[0].getVelocity())) {
+            turnEnded = false;
+        }
+
         for (size_t i = 0; i < balls.size(); ) { 
             if (table.isPocketed(balls[i])) {
                 if (i == 0) { 
@@ -103,13 +154,17 @@ int main() {
                 ++i;
             }
         }
-
+        
         cue.update(balls[0].getPosition(), sf::Vector2f(sf::Mouse::getPosition(window)));
+        
+        player1Text.setFillColor((currentPlayer == 1) ? sf::Color::White : sf::Color(100, 100, 100));
+        player2Text.setFillColor((currentPlayer == 2) ? sf::Color::White : sf::Color(100, 100, 100));
 
         window.clear();
         drawBackground(window);
         table.draw(window);
-
+        window.draw(player1Text);
+        window.draw(player2Text);
         for (const auto& ball : balls) {
             ball.draw(window, font);
         }
