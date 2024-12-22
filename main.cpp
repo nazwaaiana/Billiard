@@ -117,6 +117,9 @@ int main() {
     int currentPlayer = 2; 
     bool ballPocketed = false;
 
+    bool showPopup = false;
+    int winner = 0;
+
     while (window.isOpen()) {
         sf::Event event;
         while (window.pollEvent(event)) {
@@ -147,49 +150,45 @@ int main() {
                 int ballID = it->getID();
 
                 if (ballID == 0) { 
+                    // Bola putih masuk
                     std::cout << "Bola putih masuk ke lubang. Ganti giliran!" << std::endl;
                     it->respawn();
                     currentPlayer = (currentPlayer == 1) ? 2 : 1;
-                    ++it; 
-
+                    ++it;
                 } else if (ballID == 8) { 
+                    // Bola hitam masuk
                     std::cout << "Bola hitam masuk ke lubang. Permainan selesai!" << std::endl;
-
-                    int winner = (currentPlayer == 1) ? 2 : 1;
+                    winner = (currentPlayer == 1) ? 2 : 1;
                     std::cout << "Pemenangnya adalah Player " << winner << "!" << std::endl;
-
-                    window.close();
+                    showPopup = true;
                     break;
-
                 } else { 
-                    int ballType = (ballID >= 1 && ballID <= 7) ? 1 : 2; 
-                    if (currentPlayer == 1) {
+                    // Bola lain masuk
+                    int ballType = (ballID >= 1 && ballID <= 7) ? 1 : 2;
 
+                    if (currentPlayer == 1) {
                         if (player1Type == -1) {
                             player1Type = ballType;
                             player2Type = (ballType == 1) ? 2 : 1;
                             std::cout << "Player 1 memilih bola " << ((player1Type == 1) ? "solid" : "striped") << "." << std::endl;
-                            player1Score.addScore(ballID, it->getColor());
+                        }
 
-                        } else if (player1Type == ballType) {
+                        if (player1Type == ballType) {
                             player1Score.addScore(ballID, it->getColor());
-
                         } else {
                             std::cout << "Player 1 memasukkan bola lawan. Ganti giliran!" << std::endl;
                             currentPlayer = 2;
                             player2Score.addScore(ballID, it->getColor());
                         }
-
                     } else {
                         if (player2Type == -1) {
                             player2Type = ballType;
                             player1Type = (ballType == 1) ? 2 : 1;
                             std::cout << "Player 2 memilih bola " << ((player2Type == 1) ? "solid" : "striped") << "." << std::endl;
-                            player2Score.addScore(ballID, it->getColor());
+                        }
 
-                        } else if (player2Type == ballType) {
+                        if (player2Type == ballType) {
                             player2Score.addScore(ballID, it->getColor());
-
                         } else {
                             std::cout << "Player 2 memasukkan bola lawan. Ganti giliran!" << std::endl;
                             currentPlayer = 1;
@@ -203,7 +202,6 @@ int main() {
                 ++it;
             }
         }
-
         static bool turnEnded = false;
         if (isBallStopped(balls[0].getVelocity()) && !turnEnded) {
             if (ballPocketed) {
@@ -260,6 +258,41 @@ int main() {
         }
 
         cue.draw(window);
+
+        if (showPopup) {
+            sf::RectangleShape popup(sf::Vector2f(400.0f, 200.0f));
+            popup.setFillColor(sf::Color(50, 50, 50));
+            popup.setOutlineColor(sf::Color::White);
+            popup.setOutlineThickness(5);
+            popup.setPosition((BackWidth - 400) / 2, (BackHeight - 200) / 2);
+
+            sf::Text winnerText("The Winner Is " + std::to_string(winner) + "!", font, 25);
+            winnerText.setFillColor(sf::Color::White);
+            sf::FloatRect textBounds = winnerText.getGlobalBounds();
+            winnerText.setPosition((BackWidth - textBounds.width) / 2, (BackHeight - 200) / 2 + 40);
+
+            sf::RectangleShape closeButton(sf::Vector2f(100.0f, 50.0f));
+            closeButton.setFillColor(sf::Color(100, 100, 100));
+            closeButton.setPosition((BackWidth - 100) / 2, (BackHeight - 200) / 2 + 120);
+
+            sf::Text closeText("Close", font, 20);
+            closeText.setFillColor(sf::Color::White);
+            sf::FloatRect closeTextBounds = closeText.getGlobalBounds();
+            closeText.setPosition((BackWidth - closeTextBounds.width) / 2, (BackHeight - 200) / 2 + 135);
+
+            window.draw(popup);
+            window.draw(winnerText);
+            window.draw(closeButton);
+            window.draw(closeText);
+
+            if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
+                sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+                sf::Vector2f mousePosF(static_cast<float>(mousePos.x), static_cast<float>(mousePos.y));
+                if (closeButton.getGlobalBounds().contains(mousePosF)) {
+                    window.close();
+                }
+            }
+        }
         window.display();
     }
 
