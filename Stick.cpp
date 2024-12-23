@@ -14,12 +14,14 @@ private:
     const float stickLength;
     bool isReleased;
     std::vector<sf::VertexArray> dashedLine;
+    sf::RectangleShape powerBar; // Bar kekuatan
+    sf::RectangleShape powerBarBackground; // Latar belakang bar kekuatan
 
 public:
     Stick()
         : stickShape(sf::TriangleStrip, 4), 
           shadowShape(sf::TriangleStrip, 4), 
-          isMoving(false), maxForce(2000.0f), offsetDistance(50.0f), stickLength(550.0f), isReleased(false) {
+          isMoving(false), maxForce(2000.0f), offsetDistance(350.0f), stickLength(550.0f), isReleased(false) {
         stickShape[0].color = sf::Color(245, 222, 179); 
         stickShape[1].color = sf::Color(245, 222, 179); 
         stickShape[2].color = sf::Color(160, 82, 45);   
@@ -28,6 +30,15 @@ public:
         for (int i = 0; i < 4; ++i) {
             shadowShape[i].color = sf::Color(0, 0, 0, 100); 
         }
+
+        // Inisialisasi bar kekuatan
+        powerBarBackground.setSize(sf::Vector2f(200.0f, 20.0f));
+        powerBarBackground.setFillColor(sf::Color(50, 50, 50));
+        powerBarBackground.setPosition(10.0f, 10.0f);
+
+        powerBar.setSize(sf::Vector2f(0.0f, 20.0f));
+        powerBar.setFillColor(sf::Color(0, 255, 0));
+        powerBar.setPosition(10.0f, 10.0f);
     }
 
     void startMove(sf::Vector2f ballPosition) {
@@ -86,7 +97,7 @@ public:
 
             // Update dashed line
             dashedLine.clear();
-            const float dashLength = 10.0f;
+            const float dashLength = 5.0f;
             const float gapLength = 5.0f;
             const float totalLength = 500.0f; // Length of the dashed line
             sf::Vector2f currentPoint = ballPosition;
@@ -108,6 +119,11 @@ public:
                 currentPoint = nextPoint - normalizedDirection * gapLength; // Skip the gap
                 remainingLength -= (dashLength + gapLength);
             }
+
+            // Update power bar
+            float forceMagnitude = std::min(distance, maxForce);
+            float powerBarWidth = (forceMagnitude / maxForce) * 200.0f;
+            powerBar.setSize(sf::Vector2f(powerBarWidth, 20.0f));
         } else if (isReleased) {
             dashedLine.clear();
             isReleased = false;
@@ -121,6 +137,8 @@ public:
             for (auto& segment : dashedLine) {
                 window.draw(segment);
             }
+            window.draw(powerBarBackground); 
+            window.draw(powerBar); 
         }
     }
 };
