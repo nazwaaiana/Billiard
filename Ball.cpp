@@ -9,6 +9,7 @@ private:
     int id; 
     bool isStriped;
     bool hit; 
+    bool pocketed;
     sf::Color color; 
     sf::CircleShape shape; 
     sf::Vector2f velocity;
@@ -18,7 +19,7 @@ private:
 public:
     // Constructor
     Ball(float radius, sf::Vector2f position, sf::Color color, int id, const sf::Font& font)
-        : velocity(0.0f, 0.0f), initialPosition(position), isStriped(false), id(id), color(color) { 
+        : velocity(0.0f, 0.0f), initialPosition(position), isStriped(false), id(id), color(color), pocketed(false) { 
 
         if (id >= 9 && id <= 15) {
             isStriped = true;
@@ -40,6 +41,15 @@ public:
         sf::FloatRect textBounds = text.getLocalBounds();
         text.setOrigin(textBounds.left + textBounds.width / 2, textBounds.top + textBounds.height / 2);
         text.setPosition(shape.getPosition());
+    }
+
+    bool isPocketed() const {
+        return pocketed;
+    }
+
+    // Setter untuk status pocketed
+    void setPocketed(bool status) {
+        pocketed = status;
     }
 
     bool isHit() const {
