@@ -7,6 +7,8 @@
 #include "PoolTable.cpp"
 #include "Player.cpp"
 #include "Score.cpp"
+#include "Alert.cpp"
+#include "StartMenu.cpp"
 
 bool isBallStopped(const sf::Vector2f& velocity) {
     return std::abs(velocity.x) < MinVelocity && std::abs(velocity.y) < MinVelocity;
@@ -34,16 +36,22 @@ void checkCollision(Ball& ball1, Ball& ball2) {
 
 void drawBackground(sf::RenderWindow& window) {
     sf::RectangleShape background(sf::Vector2f(BackWidth, BackHeight));
-    background.setFillColor(sf::Color(150, 0, 0));
+    background.setFillColor(sf::Color(75, 46, 25));
     window.draw(background);
 }
 
-bool checkFoul(const std::vector<Ball>& balls, int currentPlayer, int player1Type, int player2Type) {
+bool checkFoul(const std::vector<Ball>& balls, int currentPlayer, int player1Type, int player2Type) { 
     bool foul = false;
     bool cueBallHit = false;
     bool targetBallHit = false;
+    bool cueBallPocketed = false;  
 
     for (const auto& ball : balls) {
+        if (ball.getID() == 0 && ball.isPocketed()) { 
+            cueBallPocketed = true;
+            std::cout << "Foul: Bola putih masuk ke lubang (Scratch)." << std::endl;
+        }
+       
         if (ball.getID() == 0 && ball.isMoving()) {
             cueBallHit = true;
         } else if ((currentPlayer == 1 && player1Type != -1 && ball.getID() == player1Type) || 
@@ -52,6 +60,10 @@ bool checkFoul(const std::vector<Ball>& balls, int currentPlayer, int player1Typ
                 targetBallHit = true;
             }
         }
+    }
+
+    if (cueBallPocketed) {
+        foul = true;
     }
 
     if (!cueBallHit) {
@@ -73,6 +85,13 @@ int main() {
     if (!font.loadFromFile("D:/sfmll/font/Roboto-Black.ttf")) {
         std::cerr << "Error loading font\n";
         return -1;
+    }
+
+    StartMenu menu;
+    menu.show(window, font);
+    bool gameStarted = false;
+    while (!gameStarted && window.isOpen()) {
+        gameStarted = menu.handleInput(window);
     }
 
     std::vector<Ball> balls;
@@ -117,8 +136,7 @@ int main() {
     int currentPlayer = 2; 
     bool ballPocketed = false;
 
-    bool showPopup = false;
-    int winner = 0;
+    Alert alert(font, sf::Vector2f(BackWidth, BackHeight)); 
 
     while (window.isOpen()) {
         sf::Event event;
@@ -145,25 +163,26 @@ int main() {
             }
         }
 
+        bool foulOccurred = false; 
+
         for (auto it = balls.begin(); it != balls.end();) {
             if (table.isPocketed(*it)) {
                 int ballID = it->getID();
 
-                if (ballID == 0) { 
-                    // Bola putih masuk
-                    std::cout << "Bola putih masuk ke lubang. Ganti giliran!" << std::endl;
-                    it->respawn();
-                    currentPlayer = (currentPlayer == 1) ? 2 : 1;
+                if (ballID == 0) {  
+                    std::cout << "Foul: Bola putih masuk ke lubang." << std::endl;
+                    it->respawn();  
+                    ballPocketed = true;
+                    foulOccurred = true;  
+                    currentPlayer = (currentPlayer == 1) ? 2 : 1;  
                     ++it;
-                } else if (ballID == 8) { 
-                    // Bola hitam masuk
+                } else if (ballID == 8) {  
                     std::cout << "Bola hitam masuk ke lubang. Permainan selesai!" << std::endl;
-                    winner = (currentPlayer == 1) ? 2 : 1;
+                    int winner = (currentPlayer == 1) ? 2 : 1;
                     std::cout << "Pemenangnya adalah Player " << winner << "!" << std::endl;
-                    showPopup = true;
+                    alert.show(winner);
                     break;
-                } else { 
-                    // Bola lain masuk
+                } else {  
                     int ballType = (ballID >= 1 && ballID <= 7) ? 1 : 2;
 
                     if (currentPlayer == 1) {
@@ -202,24 +221,21 @@ int main() {
                 ++it;
             }
         }
+
         static bool turnEnded = false;
         if (isBallStopped(balls[0].getVelocity()) && !turnEnded) {
             if (ballPocketed) {
                 std::cout << "Bola masuk! Pemain tetap melanjutkan giliran." << std::endl;
-                turnEnded = true;
-                ballPocketed = false;
-
+                ballPocketed = false;  
             } else {
-                if (checkFoul(balls, currentPlayer, player1Type, player2Type)) {
-                    currentPlayer = (currentPlayer == 1) ? 2 : 1;
-                    std::cout << "Foul terjadi. Ganti giliran ke pemain " << currentPlayer << "." << std::endl;
-
+                if (checkFoul(balls, currentPlayer, player1Type, player2Type)) {  
+                    std::cout << "Foul terjadi. Ganti giliran ke pemain " << ((currentPlayer == 1) ? 2 : 1) << "." << std::endl;
                 } else {
-                    currentPlayer = (currentPlayer == 1) ? 2 : 1;
-                    std::cout << "Tidak ada bola masuk. Ganti giliran ke pemain " << currentPlayer << "." << std::endl;
+                    std::cout << "Tidak ada bola masuk. Ganti giliran ke pemain " << ((currentPlayer == 1) ? 2 : 1) << "." << std::endl;
                 }
-                turnEnded = true;
+                currentPlayer = (currentPlayer == 1) ? 2 : 1;  
             }
+            turnEnded = true;  
         }
 
         if (!isBallStopped(balls[0].getVelocity())) {
@@ -259,42 +275,19 @@ int main() {
 
         cue.draw(window);
 
-        if (showPopup) {
-            sf::RectangleShape popup(sf::Vector2f(400.0f, 200.0f));
-            popup.setFillColor(sf::Color(50, 50, 50));
-            popup.setOutlineColor(sf::Color::White);
-            popup.setOutlineThickness(5);
-            popup.setPosition((BackWidth - 400) / 2, (BackHeight - 200) / 2);
-
-            sf::Text winnerText("The Winner Is " + std::to_string(winner) + "!", font, 25);
-            winnerText.setFillColor(sf::Color::White);
-            sf::FloatRect textBounds = winnerText.getGlobalBounds();
-            winnerText.setPosition((BackWidth - textBounds.width) / 2, (BackHeight - 200) / 2 + 40);
-
-            sf::RectangleShape closeButton(sf::Vector2f(100.0f, 50.0f));
-            closeButton.setFillColor(sf::Color(100, 100, 100));
-            closeButton.setPosition((BackWidth - 100) / 2, (BackHeight - 200) / 2 + 120);
-
-            sf::Text closeText("Close", font, 20);
-            closeText.setFillColor(sf::Color::White);
-            sf::FloatRect closeTextBounds = closeText.getGlobalBounds();
-            closeText.setPosition((BackWidth - closeTextBounds.width) / 2, (BackHeight - 200) / 2 + 135);
-
-            window.draw(popup);
-            window.draw(winnerText);
-            window.draw(closeButton);
-            window.draw(closeText);
+        if (alert.isVisible()) {
+            alert.draw(window);
 
             if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
                 sf::Vector2i mousePos = sf::Mouse::getPosition(window);
                 sf::Vector2f mousePosF(static_cast<float>(mousePos.x), static_cast<float>(mousePos.y));
-                if (closeButton.getGlobalBounds().contains(mousePosF)) {
+                if (alert.isCloseButtonPressed(mousePosF)) {
                     window.close();
                 }
             }
         }
+
         window.display();
     }
-
     return 0;
 }
